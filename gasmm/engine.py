@@ -14,7 +14,10 @@ from collections import defaultdict
 
 from . import config, kalshi_md, ledger
 
-SERIES = config.SERIES
+
+def _series_of(ticker):
+    """A série é o prefixo do ticker (KXHIGHNY-26JUN18-72 -> KXHIGHNY)."""
+    return ticker.split("-")[0]
 
 
 def _f(x):
@@ -36,31 +39,32 @@ def _strike_row(s):
 
 
 def discover(now):
-    """Strikes centrais ATM (mid ATUAL em [ATM_LO,ATM_HI]) dos eventos abertos.
-    Sem hindsight: usa o preço corrente na hora de cotar."""
-    mk = kalshi_md.all_markets(SERIES, "open")
-    by = defaultdict(list)
-    for m in mk:
-        if _f(m.get("floor_strike")) is not None and m.get("close_time"):
-            by[m.get("event_ticker", "")].append(m)
+    """Strikes centrais ATM (mid ATUAL em [ATM_LO,ATM_HI]) dos eventos abertos, em
+    TODAS as séries de config.SERIES. Sem hindsight: usa o preço corrente ao cotar."""
     cands = []
-    for ev, strikes in by.items():
-        med = st.median([_f(m["floor_strike"]) for m in strikes])
-        central = sorted(strikes, key=lambda m: abs(_f(m["floor_strike"]) - med))[:config.N_STRIKES]
-        for m in central:
-            close_ts = _ts(m["close_time"])
-            if close_ts is None or close_ts - now < config.QUOTE_UNTIL_S:
-                continue
-            bid = _f(m.get("yes_bid_dollars"))
-            ask = _f(m.get("yes_ask_dollars"))
-            if bid is None or ask is None or not (0 < bid < ask < 1):
-                continue
-            mid = (bid + ask) / 2
-            if not (config.ATM_LO <= mid <= config.ATM_HI):
-                continue
-            cands.append({"ticker": m["ticker"], "event": ev,
-                          "strike": _f(m["floor_strike"]), "close_ts": close_ts,
-                          "bid": bid, "ask": ask})
+    for series in config.SERIES:
+        mk = kalshi_md.all_markets(series, "open")
+        by = defaultdict(list)
+        for m in mk:
+            if _f(m.get("floor_strike")) is not None and m.get("close_time"):
+                by[m.get("event_ticker", "")].append(m)
+        for ev, strikes in by.items():
+            med = st.median([_f(m["floor_strike"]) for m in strikes])
+            central = sorted(strikes, key=lambda m: abs(_f(m["floor_strike"]) - med))[:config.N_STRIKES]
+            for m in central:
+                close_ts = _ts(m["close_time"])
+                if close_ts is None or close_ts - now < config.QUOTE_UNTIL_S:
+                    continue
+                bid = _f(m.get("yes_bid_dollars"))
+                ask = _f(m.get("yes_ask_dollars"))
+                if bid is None or ask is None or not (0 < bid < ask < 1):
+                    continue
+                mid = (bid + ask) / 2
+                if not (config.ATM_LO <= mid <= config.ATM_HI):
+                    continue
+                cands.append({"ticker": m["ticker"], "event": ev,
+                              "strike": _f(m["floor_strike"]), "close_ts": close_ts,
+                              "bid": bid, "ask": ask})
     return cands
 
 
@@ -89,8 +93,8 @@ def _process_fills(s, now):
     last = int(s.get("last_ts") or (now - 60))
     if now - last < 60:
         return s
-    cs = kalshi_md.candlesticks(SERIES, s["ticker"], start_ts=last, end_ts=now,
-                                period_interval=1)
+    cs = kalshi_md.candlesticks(_series_of(s["ticker"]), s["ticker"],
+                                start_ts=last, end_ts=now, period_interval=1)
     cands = sorted((cs.get("candlesticks", []) if isinstance(cs, dict) else []),
                    key=lambda v: v.get("end_period_ts", 0))
     for v in cands:

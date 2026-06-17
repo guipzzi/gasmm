@@ -1,11 +1,12 @@
-# gasmm — paper bot de market-making (gás AAA / Kalshi)
+# gasmm — paper bot de market-making (underlying lento / Kalshi)
 
-Paper trading autônomo de **market-making** no mercado **KXAAAGASD** (gás AAA) da
-Kalshi. É a **única** estratégia que sobreviveu à bateria de honestidade completa
-(direcional, ladder-arb e MM nos 7 mercados de commodity) — ver
-`progno_bot_2/mm_debiased.py`. Funciona porque o underlying (índice AAA de varejo)
-é **lento**: não há futuro rápido pra te pegar, então a seleção adversa é baixa
-(positiva no backtest). Nos outros 6 mercados o MM morre atropelado.
+Paper trading autônomo de **market-making** em mercados Kalshi de **underlying lento**
+(`config.SERIES`): **KXAAAGASD** (gás AAA — validado e robusto) e **KXHIGHNY** (temp
+máx NYC — único do clima que sobreviveu ao backtest de-viesado, em paper p/ confirmar
+ao vivo). MM só funciona onde o underlying é lento (sem instrumento rápido que te
+pega na cotação parada → seleção adversa baixa); em underlying rápido (WTI/FX/crypto)
+o MM morre atropelado. Cada strike é rastreado por ticker; a série é derivada dele,
+então é só adicionar tickers em `config.SERIES`. Ver `progno_bot_2/mm_debiased.py`.
 
 **Objetivo deste bot:** validar AO VIVO se a taxa de fill real bate com o backtest
 de-viesado (+$632 maker0 / +$399 com taker fee / +$378 strict, OOS replicando,

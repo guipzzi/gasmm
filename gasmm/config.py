@@ -2,7 +2,10 @@
 import os
 
 STRATEGY = "gasmm"
-SERIES = "KXAAAGASD"
+# Mercados de MM (underlying lento). Gás AAA = validado e robusto; KXHIGHNY (temp
+# máx NYC) = único do clima que sobreviveu ao de-viés (sig, strict +$2,8) — em paper
+# p/ confirmar ao vivo. Lista; cada strike é rastreado por ticker (série derivada dele).
+SERIES = ["KXAAAGASD", "KXHIGHNY"]
 BANKROLL = 5000.0                 # banca de paper (referência p/ equity)
 
 # Cotação / inventário (espelha o backtest validado: 1 ctr/fill, cap ±20)

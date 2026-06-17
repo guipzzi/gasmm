@@ -69,13 +69,23 @@ def cmd_report():
     fills = sum(int(r.get("fills") or 0) for r in rows)
     vol = sum(float(r.get("vol_seen") or 0) for r in rows)
     wins = sum(1 for r in settled if float(r.get("pnl") or 0) > 0)
+
+    def _ser(r):
+        return (r.get("ticker") or "").split("-")[0]
+    # PnL + fills por SÉRIE (gás vs NYC vs ...)
+    byser = defaultdict(lambda: {"pnl": 0.0, "fills": 0, "n": 0})
+    for r in rows:
+        b = byser[_ser(r)]
+        b["fills"] += int(r.get("fills") or 0)
+        if r.get("status") == "settled":
+            b["pnl"] += float(r.get("pnl") or 0); b["n"] += 1
     # PnL por dia (evento = dia)
     byday = defaultdict(float)
     for r in settled:
         day = (r.get("event") or "")[-8:]
         byday[day] += float(r.get("pnl") or 0)
     print("=" * 56)
-    print(f"GASMM paper — backend {ledger.backend_name()}")
+    print(f"GASMM paper — backend {ledger.backend_name()} — séries {config.SERIES}")
     print("=" * 56)
     print(f"  strikes liquidados: {len(settled)} | ativos: {len(rows)-len(settled)}")
     print(f"  PnL realizado: ${realized:+,.2f} | equity ${config.BANKROLL+realized:,.2f}")
@@ -83,6 +93,10 @@ def cmd_report():
         print(f"  dias+: {wins}/{len(settled)} = {wins/len(settled)*100:.0f}%")
     print(f"  fills totais: {fills} | volume real visto: {vol:,.0f} contratos"
           + (f" | captura {fills/vol*100:.2f}% do fluxo" if vol else ""))
+    print("  por série:")
+    for s in sorted(byser):
+        b = byser[s]
+        print(f"    {s:12} PnL ${b['pnl']:+.2f} ({b['n']} liq.) | fills {b['fills']}")
     if byday:
         print("  PnL por dia:")
         for d in sorted(byday):
