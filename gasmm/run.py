@@ -40,7 +40,7 @@ def cmd_loop():
         now = _now()
         try:
             n = engine.step(now)
-            liq = engine.settle_finished(now)
+            liq = engine.settle_finished(now) if i % 10 == 0 else 0
             if i % 10 == 0 or liq:
                 snap = engine.equity_snapshot(now)
                 print(f"  t+{i:04d} ativos={n} liq={liq} equity=${snap['equity']:,.2f} "

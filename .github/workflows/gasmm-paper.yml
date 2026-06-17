@@ -3,35 +3,34 @@ name: gasmm paper (market-making gás AAA)
 # Paper trading autônomo de MARKET-MAKING no KXAAAGASD (gás AAA) da Kalshi — a única
 # estratégia que passou em toda a bateria de honestidade. NENHUMA ordem real: os fills
 # são derivados dos trades que DE FATO aconteceram (candlesticks de 1-min). Estado
-# persiste no Supabase entre runs (runner efêmero) — independe do PC do usuário.
+# persiste no Supabase entre runs — independe do PC do usuário.
 #
-# Modelo de cadência: --once a cada 10min. A cada run, processa os candles de 1-min
-# desde o último poll usando a cotação mantida (honesto à cadência). O mercado de gás
-# é LENTO (índice de varejo), então 10min de defasagem de cotação é seguro — foi de
-# onde veio o edge (baixa seleção adversa). Barato: ~30s/run, cabe no free tier.
+# Modo --loop: re-cota a cada 60s (FIEL ao backtest de-viesado de 1-min). Um loop de
+# ~5h é iniciado a cada 6h -> cobertura ~contínua (24h). Requer minutos de Actions
+# fartos -> repo PÚBLICO (ilimitado). O loop reconcilia liquidações a cada 10 ciclos.
 #
 # Dados de mercado da Kalshi são PÚBLICOS: NÃO precisa de chave da Kalshi.
-# Secrets necessários (Settings -> Secrets -> Actions): SUPABASE_URL, SUPABASE_SERVICE_KEY
-# (mesmo projeto do progno_bot). Rode gasmm/schema.sql UMA vez no SQL Editor do Supabase.
+# Secrets: SUPABASE_URL, SUPABASE_SERVICE_KEY (service_role). Schema: gasmm/schema.sql.
 
 on:
   schedule:
-    - cron: "*/10 12-23 * * *"   # poll a cada 10min na janela ativa (US daytime)
-    - cron: "30 1 * * *"          # liquidação + relatório diário (após o close)
+    - cron: "2 */6 * * *"        # inicia um loop ~5h a cada 6h -> cobertura contínua
+    - cron: "30 1 * * *"          # settle + report diário (resumo)
   workflow_dispatch:
     inputs:
       mode:
-        description: "once | loop | settle | report"
-        default: "once"
+        description: "loop | once | settle | report"
+        default: "loop"
 
 concurrency:
-  group: gasmm-paper              # nunca dois polls concorrentes no mesmo ledger
+  group: gasmm-paper              # nunca dois loops no mesmo ledger
   cancel-in-progress: false
 
 jobs:
-  mm:
+  loop:
+    if: github.event.schedule == '2 */6 * * *' || github.event.inputs.mode == 'loop' || github.event.inputs.mode == 'once'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -39,24 +38,38 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install requests
-      - name: Poll (--once)
-        if: github.event.schedule == '*/10 12-23 * * *' || github.event.inputs.mode == 'once'
+      - name: Loop 1-min (fiel ao backtest)
+        if: github.event.schedule == '2 */6 * * *' || github.event.inputs.mode == 'loop'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          LOOP_MAX_MINUTES: "350"
+        run: python -m gasmm.run --loop
+      - name: Once (dispatch manual)
+        if: github.event.inputs.mode == 'once'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: python -m gasmm.run --once
-      - name: Liquidação + relatório
-        if: github.event.schedule == '30 1 * * *' || github.event.inputs.mode == 'settle' || github.event.inputs.mode == 'report'
+
+  daily:
+    if: github.event.schedule == '30 1 * * *' || github.event.inputs.mode == 'settle' || github.event.inputs.mode == 'report'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: gasmm-daily          # grupo separado: não fica preso atrás do loop
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install requests
+      - name: Settle + report
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
           python -m gasmm.run --settle
           python -m gasmm.run --report
-      - name: Loop (fidelidade 1-min, opcional via dispatch)
-        if: github.event.inputs.mode == 'loop'
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          LOOP_MAX_MINUTES: "240"
-        run: python -m gasmm.run --loop
