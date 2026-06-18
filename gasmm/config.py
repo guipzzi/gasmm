@@ -2,10 +2,16 @@
 import os
 
 STRATEGY = "gasmm"
-# Mercados de MM (underlying lento). Gás AAA = validado e robusto; KXHIGHNY (temp
-# máx NYC) = único do clima que sobreviveu ao de-viés (sig, strict +$2,8) — em paper
-# p/ confirmar ao vivo. Lista; cada strike é rastreado por ticker (série derivada dele).
-SERIES = ["KXAAAGASD", "KXHIGHNY"]
+# Mercados de MM (underlying lento). Cada strike é rastreado por ticker (série
+# derivada dele), então adicionar mercado = só pôr o ticker aqui.
+#   KXAAAGASD — gás AAA diário: validado e robusto (strict +$378/57d ~$6,6/dia).
+#   KXHIGHNY  — temp máx NYC: único do clima a sobreviver ao de-viés (sig, strict
+#               +$2,8) — experimental, em paper p/ confirmar fills ao vivo.
+#   KXAAAGASW — gás AAA semanal: mesmo underlying, robusto ao de-viés (strict +$12,
+#               seleção adversa +; ~$0,3/dia — pequeno mas mesmo edge).
+# WATCH (dormentes agora, com histórico real — re-checar se reabrirem com volume):
+#   KXJETFUEL (querosene ~9k/sem), KXHOILW (óleo de aquecimento ~11k/sem).
+SERIES = ["KXAAAGASD", "KXHIGHNY", "KXAAAGASW"]
 BANKROLL = 5000.0                 # banca de paper (referência p/ equity)
 
 # Cotação / inventário (espelha o backtest validado: 1 ctr/fill, cap ±20)
