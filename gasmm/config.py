@@ -11,7 +11,7 @@ STRATEGY = "gasmm"
 #               seleção adversa +; ~$0,3/dia — pequeno mas mesmo edge).
 # WATCH (dormentes agora, com histórico real — re-checar se reabrirem com volume):
 #   KXJETFUEL (querosene ~9k/sem), KXHOILW (óleo de aquecimento ~11k/sem).
-SERIES = ["KXAAAGASD", "KXHIGHNY", "KXAAAGASW"]
+SERIES = ["KXAAAGASD"]   # FOCO: só gás diário (o edge validado). NYC/semanal cortados.
 BANKROLL = 5000.0                 # banca de paper (referência p/ equity)
 
 # Cotação / inventário (espelha o backtest validado: 1 ctr/fill, cap ±20)
